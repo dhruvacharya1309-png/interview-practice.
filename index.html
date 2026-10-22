@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Interview Practice</title>
+<style>
+  :root {
+    --teal: #1F5C5C; --offwhite: #FAF7F2; --amber: #E8A33D; --charcoal: #2B2B2B;
+    --sage: #A8C5A0; --terracotta: #C97B63; --sand: #EFE8DC;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: Georgia, "Times New Roman", serif; background: var(--offwhite); color: var(--charcoal); line-height: 1.6; }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 24px 16px 60px; }
+  h1 { color: var(--teal); font-size: 1.6rem; margin-bottom: 4px; }
+  h2 { color: var(--teal); font-size: 1.2rem; margin: 22px 0 6px; }
+  .sub { margin-top: 0; opacity: 0.75; }
+  .card { background: var(--sand); border-radius: 12px; padding: 18px; margin: 18px 0; }
+  label { display: block; font-weight: bold; margin: 14px 0 6px; color: var(--teal); }
+  select, input[type=number] { width: 100%; font: inherit; padding: 10px; border: 1px solid #cfc6b5; border-radius: 8px; background: #fff; }
+  button { background: var(--teal); color: #fff; border: none; border-radius: 8px; padding: 12px 20px; font: inherit; cursor: pointer; margin: 10px 8px 0 0; }
+  button.secondary { background: var(--amber); color: var(--charcoal); }
+  button:disabled { opacity: 0.45; cursor: default; }
+  .status { font-weight: bold; color: var(--teal); }
+  .note { font-size: 0.85rem; opacity: 0.75; }
+  .error { font-size: 0.95rem; color: #9a3b26; font-weight: bold; }
+  .hidden { display: none; }
+  ul { padding-left: 20px; }
+  .level { display: inline-block; padding: 2px 10px; border-radius: 999px; background: #fff; border: 1px solid #cfc6b5; font-size: 0.9rem; margin: 0 6px; }
+  .quote { border-left: 3px solid var(--terracotta); padding-left: 10px; margin: 6px 0; font-style: italic; }
+  .heard { background: #fff; border-radius: 8px; padding: 10px 12px; min-height: 3.2em; font-size: 1.05rem; }
+  .meter { height: 10px; background: #fff; border-radius: 6px; overflow: hidden; margin: 8px 0; border: 1px solid #cfc6b5; }
+  .meter span { display: block; height: 100%; width: 0; background: var(--teal); }
+  .log { background: #fff; border-radius: 8px; padding: 8px 12px; max-height: 220px; overflow-y: auto; font-size: 0.92rem; }
+  .log p { margin: 4px 0; }
+  .log .q { color: var(--teal); font-weight: bold; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+  td, th { text-align: left; padding: 6px 4px; border-bottom: 1px solid #d9cfbd; vertical-align: top; }
+  .consent label { font-weight: normal; color: var(--charcoal); display: flex; gap: 8px; align-items: flex-start; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Interview Practice</h1>
+  <p class="sub">Speak your answers. Take your time.</p>
+
+  <!-- SETUP -->
+  <div id="setup" class="card">
+    <label for="field">Choose your field</label>
+    <select id="field">
+      <option>Finance</option>
+      <option>HR</option>
+      <option>Marketing</option>
+      <option>Product management</option>
+      <option>International business</option>
+      <option>General</option>
+      <option>Other</option>
+    </select>
+    <label for="count">How many questions? (5 to 25)</label>
+    <input id="count" type="number" min="5" max="25" value="10">
+    <button id="toConsent">Continue</button>
+  </div>
+
+  <!-- CONSENT -->
+  <div id="consent" class="card consent hidden">
+    <h2>Before we start</h2>
+    <p>This practice uses your microphone. Your speech is turned into text by your browser's built-in speech feature. In Chrome, that speech is processed by Google. We measure your pace, pauses, filler words and pitch to write your report.</p>
+    <p>We don't keep the recording or the transcript after you close this page. Your report may mention things that were hard to measure. It may also note answers that sounded read aloud or scripted. These are things to review, not a verdict on you.</p>
+    <label><input type="checkbox" id="agree"> I understand and agree to this.</label>
+    <button id="startBtn" disabled>I agree and start</button>
+    <p class="note" id="supportNote"></p>
+  </div>
+
+  <!-- INTERVIEW -->
+  <div id="interview" class="hidden">
+    <p class="status" id="status"></p>
+    <p class="note" id="counter"></p>
+    <div class="card"><p id="question" style="font-size:1.15rem;margin:0;"></p></div>
+    <p class="error" id="aiNote"></p>
+
+    <p class="note" style="margin:0;">Microphone level</p>
+    <div class="meter"><span id="meterBar"></span></div>
+
+    <p class="note" style="margin:0 0 4px;">What I'm hearing from you</p>
+    <div id="liveText" class="heard"></div>
+
+    <details style="margin-top:12px;">
+      <summary class="note">Transcript so far</summary>
+      <div id="transcriptLog" class="log"></div>
+    </details>
+
+    <button id="repeatBtn" class="secondary" disabled>Repeat question</button>
+    <button id="finishBtn" disabled>Finish answer</button>
+    <button id="retryAiBtn" class="secondary hidden">Retry AI reply</button>
+  </div>
+
+  <!-- LOADING -->
+  <div id="loading" class="card hidden">
+    <p class="status">Writing your report. This takes about a minute.</p>
+  </div>
+
+  <!-- REPORT (filled by the script) -->
+  <div id="report" class="hidden"></div>
+
+</div>
+
+<script>
+  const OPENING = "What describes you the most?";
+
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  let field = "General", total = 10, current = OPENING, answers = [];
+  let listening = false, endResolve = null, retryResolve = null;
+  let recog = null, stream = null, audioCtx = null, analyser = null, buf = null, timer = null, diagTimer = null;
+  let finals = [], liveInterim = "", gotResult = false;
+  let startedAt = 0, speechStartAt = 0, lastVoicedAt = 0, pauses = [], pitches = [], sharpSounds = 0, prevRms = 0;
+
+  const $ = id => document.getElementById(id);
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const round = (n, d) => Math.round(n * 10 ** d) / 10 ** d;
+
+  function el(tag, text, cls) {
+    const e = document.createElement(tag);
+    if (text !== undefined) e.textContent = text;
+    if (cls) e.className = cls;
+    return e;
+  }
+  function list(items) {
+    const ul = el("ul");
+    (items || []).forEach(i => ul.appendChild(el("li", i)));
+    return ul;
+  }
+  function show(id) {
+    ["setup", "consent", "interview", "loading", "report"].forEach(x => $(x).classList.toggle("hidden", x !== id));
+  }
+  function setStatus(t) { $("status").textContent = t; }
+
+  // ---- Setup and consent ----
+  if (!SR) {
+    $("supportNote").textContent = "This browser can't do voice practice. Please open the link in Chrome.";
+  }
+  $("agree").onchange = () => { $("startBtn").disabled = !($("agree").checked && SR); };
+
+  $("toConsent").onclick = () => {
+    field = $("field").value;
+    total = Math.min(25, Math.max(5, parseInt($("count").value) || 10));
+    show("consent");
+  };
+
+  $("startBtn").onclick = async () => {
+    try {
+      const test = await navigator.mediaDevices.getUserMedia({ audio: true });
+      test.getTracks().forEach(t => t.stop());
+    } catch (e) {
+      $("supportNote").textContent = "We need your microphone to continue. Please allow it in your browser settings, then try again.";
+      return;
+    }
+    answers = [];
+    $("transcriptLog").innerHTML = "";
+    show("interview");
+    askQuestion(OPENING);
+  };
+
+  // ---- Speaking: sentence by sentence, slower, with short pauses ----
+  function pickVoice() {
+    const voices = ("speechSynthesis" in window) ? speechSynthesis.getVoices() : [];
+    return voices.find(v => /^en/i.test(v.lang) && /google/i.test(v.name))
+        || voices.find(v => /^en/i.test(v.lang) && /natural|premium|enhanced/i.test(v.name))
+        || voices.find(v => /^en/i.test(v.lang))
+        || null;
+  }
+
+  function speakOne(text) {
+    return new Promise(resolve => {
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = "en-IN";
+      u.rate = 0.9;
+      u.pitch = 1.0;
+      const v = pickVoice();
+      if (v) u.voice = v;
+      const guard = setTimeout(resolve, Math.max(3000, text.length * 110));
+      u.onend = () => { clearTimeout(guard); resolve(); };
+      u.onerror = () => { clearTimeout(guard); resolve(); };
+      speechSynthesis.speak(u);
+    });
+  }
+
+  async function speak(text) {
+    if (!("speechSynthesis" in window)) return;
+    speechSynthesis.cancel();
+    const sentences = text.split(/(?<=[.?!])\s+/).filter(s => s.trim());
+    for (const s of sentences) {
+      await speakOne(s);
+      await sleep(250);
+    }
+  }
+
+  // ---- Interview loop ----
+  async function askQuestion(text) {
+    current = text;
+    show("interview");
+    $("question").textContent = text;
+    $("counter").textContent = "Question " + (answers.length + 1) + " of " + total;
+    $("aiNote").textContent = "";
+    $("liveText").textContent = "";
+    $("finishBtn").disabled = true;
+    $("repeatBtn").disabled = true;
+    setStatus("Speaking…");
+    await speak(text);
+    $("repeatBtn").disabled = false;
+    await listen();
+  }
+
+  // Keeps listening until the student actually says something.
+  // Never moves on from silence.
+  async function listen() {
+    let attempt = null;
+    while (!attempt) {
+      setStatus("Listening. Take your time, then tap Finish answer.");
+      await startAudio();
+      $("finishBtn").disabled = false;
+      $("repeatBtn").disabled = true;
+      await new Promise(r => { endResolve = r; });
+      $("finishBtn").disabled = true;
+      setStatus("Thinking…");
+
+      const got = await stopAudio();
+      if (got.transcript.trim()) {
+        attempt = got;
+      } else {
+        setStatus("I didn't hear an answer.");
+        await speak("I didn't hear an answer. Please answer the question.");
+      }
+    }
+
+    answers.push({ question: current, transcript: attempt.transcript, metadata: attempt.metadata });
+
+    const log = $("transcriptLog");
+    log.appendChild(el("p", "Q: " + current, "q"));
+    log.appendChild(el("p", "A: " + attempt.transcript));
+    log.scrollTop = log.scrollHeight;
+
+    if (answers.length >= total) return finishInterview();
+
+    await nextTurn(attempt.transcript, attempt.metadata);
+  }
+
+  // The next question always comes from the AI, based on the last answer.
+  async function nextTurn(transcript, metadata) {
+    let result = null;
+    while (!result) {
+      setStatus("Thinking…");
+      result = await askAI(transcript, metadata);
+      if (result.error) {
+        $("aiNote").textContent = "The AI reply failed: " + result.error;
+        setStatus("Tap Retry AI reply to try again.");
+        $("retryAiBtn").classList.remove("hidden");
+        await new Promise(r => { retryResolve = r; });
+        $("retryAiBtn").classList.add("hidden");
+        $("aiNote").textContent = "";
+        result = null;
+      }
+    }
+    await askQuestion(result.text);
+  }
+
+  async function askAI(transcript, metadata) {
+    try {
+      const history = answers.slice(Math.max(0, answers.length - 7), answers.length - 1)
+        .map(a => ({ question: a.question, transcript: a.transcript }));
+      const res = await fetch("/.netlify/functions/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "turn",
+          field,
+          question: current,
+          transcript,
+          metadata,
+          history
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.reply) return { text: data.reply };
+      return { error: data.error || ("server status " + res.status) };
+    } catch (e) {
+      return { error: e.message };
+    }
+  }
+
+  $("repeatBtn").onclick = () => { if (!listening) speak(current); };
+  $("finishBtn").onclick = () => {
+    if (endResolve) { const r = endResolve; endResolve = null; r(); }
+  };
+  $("retryAiBtn").onclick = () => {
+    if (retryResolve) { const r = retryResolve; retryResolve = null; r(); }
+  };
+
+  // ---- Listening, live transcript and measuring ----
+  async function startAudio() {
+    finals = [];
+    liveInterim = "";
+    gotResult = false;
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 2048;
+    audioCtx.createMediaStreamSource(stream).connect(analyser);
+    buf = new Float32Array(analyser.fftSize);
+
+    startedAt = performance.now();
+    speechStartAt = 0; lastVoicedAt = 0; pauses = []; pitches = []; sharpSounds = 0; prevRms = 0;
+    timer = setInterval(sample, 100);
+
+    recog = new SR();
+    recog.lang = "en-IN";
+    recog.continuous = true;
+    recog.interimResults = true;
+    recog.maxAlternatives = 1;
+    recog.onresult = e => {
+      gotResult = true;
+      let interim = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const r = e.results[i];
+        if (r.isFinal) finals.push(r[0].transcript.trim());
+        else interim += r[0].transcript;
+      }
+      liveInterim = interim.trim();
+      $("liveText").textContent = (finals.join(" ") + " " + liveInterim).trim();
+    };
+    recog.onerror = e => {
+      if (e.error === "not-allowed") setStatus("Microphone is blocked. Allow it in your browser settings.");
+    };
+    recog.onend = () => {
+      if (listening) { try { recog.start(); } catch (e) {} }
+    };
+
+    // If the phone hears voice but no words come back, say so clearly
+    clearTimeout(diagTimer);
+    diagTimer = setTimeout(() => {
+      if (listening && !gotResult && speechStartAt) {
+        setStatus("I can hear you, but I can't turn your speech into words. Open this page in Chrome (not an in-app browser), then try again.");
+      }
+    }, 10000);
+
+    listening = true;
+    recog.start();
+  }
+
+  function sample() {
+    analyser.getFloatTimeDomainData(buf);
+    const now = performance.now();
+    let sum = 0;
+    for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+    const rms = Math.sqrt(sum / buf.length);
+
+    $("meterBar").style.width = Math.min(100, rms * 400) + "%";
+
+    // Sudden sharp sounds (rough check for typing-like taps)
+    if (rms > 0.08 && prevRms > 0 && rms > prevRms * 6) sharpSounds++;
+    prevRms = rms;
+
+    if (rms > 0.02) {
+      if (!speechStartAt) speechStartAt = now;
+      if (lastVoicedAt && now - lastVoicedAt >= 1000) pauses.push((now - lastVoicedAt) / 1000);
+      lastVoicedAt = now;
+      const f0 = pitchOf(buf, audioCtx.sampleRate);
+      if (f0) pitches.push(12 * Math.log2(f0 / 100));
+    }
+  }
+
+  // Rough pitch estimate (autocorrelation), voice range about 70 to 400 Hz
+  function pitchOf(data, sr) {
+    let best = 0, bestLag = -1;
+    const minLag = Math.floor(sr / 400), maxLag = Math.floor(sr / 70);
+    for (let lag = minLag; lag <= maxLag; lag++) {
+      let c = 0;
+      for (let i = 0; i + lag < data.length; i++) c += data[i] * data[i + lag];
+      if (c > best) { best = c; bestLag = lag; }
+    }
+    return bestLag > 0 ? sr / bestLag : 0;
+  }
+
+  async function stopAudio() {
+    listening = false;
+    clearInterval(timer);
+    clearTimeout(diagTimer);
+    const endAt = performance.now();
+    try { recog.stop(); } catch (e) {}
+    await sleep(800); // let the last words arrive
+    stream.getTracks().forEach(t => t.stop());
+    audioCtx.close();
+    $("meterBar").style.width = "0%";
+
+    const transcript = (finals.join(" ") + " " + liveInterim).trim();
+    const speakingS = speechStartAt ? (endAt - speechStartAt) / 1000 : 0;
+    return { transcript, metadata: measure(transcript, (endAt - startedAt) / 1000, speakingS) };
+  }
+
+  function spread(values) {
+    if (values.length < 2) return 0;
+    const m = values.reduce((a, b) => a + b, 0) / values.length;
+    return Math.sqrt(values.reduce((a, b) => a + (b - m) ** 2, 0) / values.length);
+  }
+
+  function measure(transcript, durationS, speakingS) {
+    const words = transcript ? transcript.split(/\s+/).length : 0;
+    const fillers = (transcript.match(/\b(um+|uh+|erm|hmm|you know|i mean|basically|actually)\b/gi) || []).length;
+    const sd = spread(pitches);
+    return {
+      duration_s: round(durationS, 1),
+      speaking_s: round(speakingS, 1),
+      words,
+      wpm: speakingS > 5 ? Math.round(words / (speakingS / 60)) : 0,
+      pitch_variance: pitches.length < 5 ? "Not enough voice to measure" : sd < 2 ? "Low" : sd < 5 ? "Normal" : "High",
+      filler_count: fillers,
+      filler_per_min: speakingS > 5 ? round(fillers / (speakingS / 60), 1) : 0,
+      pause_count: pauses.length,
+      long_pause_count: pauses.filter(p => p >= 2).length,
+      longest_pause_s: pauses.length ? round(Math.max(...pauses), 1) : 0,
+      response_delay_s: speechStartAt ? round((speechStartAt - startedAt) / 1000, 1) : null,
+      sharp_sounds_count: sharpSounds
+    };
+  }
+
+  // ---- Report ----
+  async function finishInterview() {
+    show("loading");
+    try {
+      const res = await fetch("/.netlify/functions/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "report",
+          field,
+          turns: answers.map(a => ({
+            question: a.question,
+            transcript: a.transcript,
+            metadata: a.metadata
+          }))
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Report failed");
+      renderReport(data);
+    } catch (e) {
+      const box = $("report");
+      box.innerHTML = "";
+      box.className = "card";
+      box.appendChild(el("p", "The report could not be written just now. Your answers are still here. Reason: " + e.message));
+      const retry = el("button", "Try again");
+      retry.onclick = finishInterview;
+      box.appendChild(retry);
+      show("report");
+    }
+  }
+
+  function deliveryTable(metas) {
+    const v = metas.filter(m => m && m.words > 0);
+    const avg = k => v.length ? v.reduce((s, m) => s + (Number(m[k]) || 0), 0) / v.length : 0;
+    const sum = k => v.reduce((s, m) => s + (Number(m[k]) || 0), 0);
+    const delays = v.map(m => m.response_delay_s).filter(d => d !== null && d !== undefined);
+
+    const rows = [
+      ["Pace", v.length ? Math.round(avg("wpm")) + " words per minute (comfortable range is about 110 to 160)" : "Not measured"],
+      ["Pitch variation, per answer", v.map(m => m.pitch_variance).join(" / ") || "Not measured"],
+      ["Filler words", sum("filler_count") + " in total (about " + avg("filler_per_min").toFixed(1) + " per minute)"],
+      ["Pauses", sum("pause_count") + " in total, " + sum("long_pause_count") + " of them two seconds or longer"],
+      ["Longest pause", Math.max(0, ...v.map(m => Number(m.longest_pause_s) || 0)) + " seconds"],
+      ["Time before you started speaking", delays.length ? (delays.reduce((a, b) => a + b, 0) / delays.length).toFixed(1) + " seconds on average" : "Not measured"],
+      ["Typing-like sounds counted", sum("sharp_sounds_count") + " (worth reviewing, not confirmed)"]
+    ];
+
+    const t = el("table");
+    rows.forEach(([label, value]) => {
+      const tr = el("tr");
+      tr.appendChild(el("th", label));
+      tr.appendChild(el("td", value));
+      t.appendChild(tr);
+    });
+    return t;
+  }
+
+  function transcriptBlock() {
+    const wrap = el("div", undefined, "log");
+    answers.forEach((a, i) => {
+      wrap.appendChild(el("p", (i + 1) + ". Q: " + a.question, "q"));
+      wrap.appendChild(el("p", "A: " + a.transcript));
+    });
+    return wrap;
+  }
+
+  function renderReport(r) {
+    const box = $("report");
+    box.innerHTML = "";
+    box.className = "card";
+
+    box.appendChild(el("h2", "Your practice report"));
+    box.appendChild(el("p", r.summary || ""));
+
+    box.appendChild(el("h2", "Scores (first session, so this is your baseline)"));
+    (r.scores || []).forEach(s => {
+      const p = el("p");
+      p.appendChild(el("strong", s.area + ":"));
+      p.appendChild(el("span", s.level, "level"));
+      p.appendChild(el("span", s.note || ""));
+      box.appendChild(p);
+    });
+
+    box.appendChild(el("h2", "What worked"));
+    box.appendChild(list(r.strengths));
+
+    box.appendChild(el("h2", "Focus next"));
+    box.appendChild(list((r.focus || []).slice(0, 2)));
+    if (r.nextStep) box.appendChild(el("p", r.nextStep));
+
+    box.appendChild(el("h2", "How you spoke"));
+    box.appendChild(deliveryTable(answers.map(a => a.metadata)));
+
+    box.appendChild(el("h2", "Your words, as heard"));
+    box.appendChild(transcriptBlock());
+
+    const ev = r.evidence || {};
+    if ((ev.numbers || []).length) { box.appendChild(el("p", "Numbers and results you gave:")); box.appendChild(list(ev.numbers)); }
+    if ((ev.tools_and_skills || []).length) { box.appendChild(el("p", "Tools and skills you named:")); box.appendChild(list(ev.tools_and_skills)); }
+    (ev.quotes || []).forEach(q => box.appendChild(el("p", "\u201C" + q + "\u201D", "quote")));
+
+    box.appendChild(el("h2", "Worth reviewing"));
+    const flags = r.flags || [];
+    if (!flags.length) box.appendChild(el("p", "Nothing was flagged."));
+    flags.forEach(f => {
+      const p = el("p");
+      p.appendChild(el("strong", (f.label || "Note") + ": "));
+      p.appendChild(el("span", f.detail || ""));
+      box.appendChild(p);
+      if (f.quote) box.appendChild(el("p", "\u201C" + f.quote + "\u201D", "quote"));
+    });
+    box.appendChild(el("p", "These are things to look at, not a judgement of you.", "note"));
+
+    box.appendChild(el("h2", "What was hard to detect"));
+    box.appendChild(list([
+      "Voices other than yours are not measured in this version.",
+      "Typing-like sounds are counted, but they can be confused with other sudden sounds.",
+      ...(r.hard_to_detect || [])
+    ]));
+
+    const again = el("button", "Try again", "secondary");
+    again.onclick = () => { answers = []; show("setup"); };
+    const home = el("button", "Back to home");
+    home.onclick = () => { answers = []; show("setup"); };
+    box.appendChild(again);
+    box.appendChild(home);
+
+    show("report");
+  }
+
+  show("setup");
+</script>
+</body>
+</html>
